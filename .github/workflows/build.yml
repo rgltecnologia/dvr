@@ -3,7 +3,7 @@ name: Build APK
 on:
   push:
     branches: [ "main", "master" ]
-  workflow_dispatch: # Permite rodar manualmente
+  workflow_dispatch:
 
 jobs:
   build:
@@ -19,11 +19,33 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Dar permissão ao Gradle Wrapper
-      run: chmod +x gradlew
+    - name: Garantir Gradle Wrapper (jar + scripts)
+      run: |
+        mkdir -p gradle/wrapper
+        if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
+          echo "Baixando gradle-wrapper.jar..."
+          curl -L -o gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/v8.9.0/gradle/wrapper/gradle-wrapper.jar
+        fi
+        if [ ! -f gradle/wrapper/gradle-wrapper.properties ]; then
+          echo "Criando gradle-wrapper.properties..."
+          cat > gradle/wrapper/gradle-wrapper.properties <<'EOF'
+        distributionBase=GRADLE_USER_HOME
+        distributionPath=wrapper/dists
+        distributionUrl=https\://services.gradle.org/distributions/gradle-8.9-bin.zip
+        networkTimeout=10000
+        validateDistributionUrl=true
+        zipStoreBase=GRADLE_USER_HOME
+        zipStorePath=wrapper/dists
+        EOF
+        fi
+        if [ ! -f gradlew ] || [ ! -f gradlew.bat ]; then
+          echo "Gerando gradlew e gradlew.bat via GradleWrapperMain..."
+          java -classpath gradle/wrapper/gradle-wrapper.jar org.gradle.wrapper.GradleWrapperMain wrapper --gradle-version 8.9
+        fi
+        chmod +x gradlew
 
     - name: Compilar APK (Debug)
-      run: ./gradlew assembleDebug
+      run: ./gradlew assembleDebug --no-daemon
 
     - name: Upload do APK
       uses: actions/upload-artifact@v4
